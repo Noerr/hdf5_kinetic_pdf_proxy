@@ -110,6 +110,7 @@ main(int argc, char **argv)
 	
 	hid_t data_create_pl = H5Pcreate(H5P_DATASET_CREATE);
 	
+	
 	// This writeDataSet implementation has been written assuming the entire dataset is written at once (thus the H5Dcreate call below inside writeDataSet)
 	// and no provision or promise for what should be expected in unwritten regions of the data set. (undefined)
 	// In this case, we don't want to write fill values that are subsequently overwritten. Documentation for H5D_FILL_TIME_IFSET says,
@@ -117,6 +118,18 @@ main(int argc, char **argv)
 	// H5D_FILL_TIME_NEVER could be just as appropriate except
 	// development might come around later and add a fill value concept and H5Pset_fill_value() call.
 	herr_t pset_ret1 = H5Pset_fill_time(data_create_pl, H5D_FILL_TIME_NEVER );
+	
+	
+	// Data Set Chunking:
+	hsize_t chunkShape[rank] = {1,1,1,NV,NV,NV,dof,num_species};
+	herr_t pset_ret2 = H5Pset_chunk (data_create_pl, rank, &chunkShape[0]);
+	
+	
+	if (pset_ret1 < 0 || pset_ret2 < 0)
+		throw std::runtime_error("WxHdf5IoTmpl::writeDataSet: Unexpected dataset property set failed.");
+	
+	
+	//hid_t data_access_pl = H5Pcreate(H5P_DATASET_ACCESS);
 	
 	hid_t dn = H5Dcreate(variables_node, "pdf", H5T_NATIVE_DOUBLE, filespace, H5P_DEFAULT, data_create_pl, H5P_DEFAULT);
 	herr_t pset_ret3 = H5Pclose(data_create_pl);
@@ -151,7 +164,7 @@ main(int argc, char **argv)
 	
 	// Set for collective I/O
 	hid_t xferPropList = H5Pcreate(H5P_DATASET_XFER);
-	ret1 = H5Pset_dxpl_mpio(xferPropList, H5FD_MPIO_INDEPENDENT ); // H5FD_MPIO_COLLECTIVE); // what's better?  H5FD_MPIO_INDEPENDENT
+	ret1 = H5Pset_dxpl_mpio(xferPropList, H5FD_MPIO_INDEPENDENT ); // what's better?  H5FD_MPIO_INDEPENDENT or H5FD_MPIO_COLLECTIVE
 	if (ret1 < 0) {
 		H5Sclose(memoryspace);
 		H5Sclose(filespace);
