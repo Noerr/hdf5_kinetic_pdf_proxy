@@ -165,6 +165,7 @@ main(int argc, char **argv)
 	// Set for collective I/O
 	hid_t xferPropList = H5Pcreate(H5P_DATASET_XFER);
 	ret1 = H5Pset_dxpl_mpio(xferPropList, H5FD_MPIO_INDEPENDENT ); // what's better?  H5FD_MPIO_INDEPENDENT or H5FD_MPIO_COLLECTIVE
+
 	if (ret1 < 0) {
 		H5Sclose(memoryspace);
 		H5Sclose(filespace);
