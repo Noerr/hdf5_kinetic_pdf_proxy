@@ -24,7 +24,7 @@ const char* output_filename_base = "pdf_out_";
 const char* COMPRESS_ARG = "COMPRESS";
 
 std::list<unsigned> getPrimeFactors(unsigned n);
-size_t setProblemSize( int myrank, int numprocs, const char * const*tileStrings, size_t* tile_x, size_t* tile_y, size_t* tile_z, size_t* p_x, size_t* p_y, size_t* p_z, size_t* ipx, size_t* ipy, size_t* ipz  );
+size_t setProblemSize( const int myrank, int numprocs, const char * const*tileStrings, size_t* tile_x, size_t* tile_y, size_t* tile_z, size_t* p_x, size_t* p_y, size_t* p_z, size_t* ipx, size_t* ipy, size_t* ipz  );
 void initMemory( int tag, size_t memCount, double * local_data_ptr );
 
 
@@ -237,7 +237,7 @@ main(int argc, char **argv)
  * @out ipx, ipy, ipz  : 3d index of myrank among [p_x, p_y, p_z] decomposition box
  * @return Total Global Array Size in Bytes
  **/
-size_t setProblemSize( int myrank, int numprocs, const char * const *tileStrings, size_t* tile_x, size_t* tile_y, size_t* tile_z, size_t* p_x, size_t* p_y, size_t* p_z, size_t* ipx, size_t* ipy, size_t* ipz  )
+size_t setProblemSize( const int myrank, int numprocs, const char * const *tileStrings, size_t* tile_x, size_t* tile_y, size_t* tile_z, size_t* p_x, size_t* p_y, size_t* p_z, size_t* ipx, size_t* ipy, size_t* ipz  )
 {
 	std::stringstream sx(tileStrings[0]), sy(tileStrings[1]), sz(tileStrings[2]);
 	sx >> *tile_x; sy >> *tile_y; sz >> *tile_z;
@@ -257,10 +257,10 @@ size_t setProblemSize( int myrank, int numprocs, const char * const *tileStrings
 	//coordinates for myrank in the process decomposition box:
 	size_t stride = (*p_y)*(*p_z);
 	*ipx = myrank / stride;
-	myrank = myrank % stride;
+	int rem = myrank % stride;
 	stride = (*p_z);
-	*ipy = myrank / stride;
-	*ipz = myrank % stride;
+	*ipy = rem / stride;
+	*ipz = rem % stride;
 	if ( (*ipx >= *p_x) || (*ipy >= *p_y) || (*ipz >= *p_z)  )
 		throw std::runtime_error("something in decomposition math didn't work out.");
 	
@@ -269,7 +269,7 @@ size_t setProblemSize( int myrank, int numprocs, const char * const *tileStrings
 	       globalArrayBytes *= NV * NV * NV;
 	       globalArrayBytes *= dof * num_species;
 	if (myrank == 0)
-		std::cout << "Dataset decomposition tiles per process: { " << *p_x << ", " << *p_y << ", " << *p_z << "}\n"
+		std::cout << "Dataset global decomposition of tiles (processes): { " << *p_x << ", " << *p_y << ", " << *p_z << "}\n"
 		          << "Tile Size: { " << *tile_x << ", " << *tile_y << ", " << *tile_z << ", " << NV << ", " << NV << ", " << NV << ", " << dof << ", " << num_species <<  "}\n"
 		          << "Total GlobalArray Size " <<  std::setw(4+7) << std::setprecision(4) << std::scientific << globalArrayBytes*1.0 << " Bytes  "<< std::endl;
 	return globalArrayBytes;
