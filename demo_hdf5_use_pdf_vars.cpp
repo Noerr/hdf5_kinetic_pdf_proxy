@@ -21,11 +21,12 @@ const int num_species = 2;
 
 const char* output_filename_base = "pdf_out_";
 //const char* input_filename  = "simulation_checkpoint_state.h5";
+const char* COMPRESS_ARG = "COMPRESS";
 
 std::list<unsigned> getPrimeFactors(unsigned n);
 size_t setProblemSize( int myrank, int numprocs, const char * const*tileStrings, size_t* tile_x, size_t* tile_y, size_t* tile_z, size_t* p_x, size_t* p_y, size_t* p_z, size_t* ipx, size_t* ipy, size_t* ipz  );
 void initMemory( int tag, size_t memCount, double * local_data_ptr );
-typedef std::chrono::system_clock timer;
+
 
 
 int
@@ -53,12 +54,22 @@ main(int argc, char **argv)
 	
 	// Dataset Shape
 	size_t tile_x, tile_y, tile_z, p_x, p_y, p_z, ipx, ipy, ipz, globalArrayBytes;
+	bool compress = false;
 	try {
-		if (argc != 4 )
-			throw std::runtime_error("bad arg count");
+		if (argc < 4 )
+			throw std::runtime_error("Too few arguments supplied.");
 		globalArrayBytes = setProblemSize( mympirank, numprocs, argv+1, &tile_x, &tile_y, &tile_z, &p_x, &p_y, &p_z, &ipx, &ipy, &ipz );
+		
+		if (argc == 5) {
+			if (std::string(argv[4]) == COMPRESS_ARG )
+				compress = true;
+			else
+				throw std::runtime_error("Bad COMPRESS argument.");
+		}
+		if (argc > 5)
+			std::runtime_error("Too many arguments supplied.");
 	} catch(...) {
-		std::cerr << "Expecting three integer arguments for process tile size: nx ny nz " << std::endl;
+		std::cerr << "Check arguments. Expecting three integer arguments for process tile size: nx ny nz    and optional " << COMPRESS_ARG << std::endl;
 		return 1;
 	}
 	
@@ -75,7 +86,7 @@ main(int argc, char **argv)
 	double* local_data_ptr = new double[memCount];
 	initMemory( mympirank, memCount, local_data_ptr );
 	std::stringstream output_filename_ss;
-	output_filename_ss << output_filename_base << tile_x*p_x << "x" << tile_y*p_y << "x" << tile_z*p_z << ".h5";
+	output_filename_ss << output_filename_base << tile_x*p_x << "x" << tile_y*p_y << "x" << tile_z*p_z << (compress? "_compressed" : "" )<< ".h5";
 	
 	
 	hid_t plistId = H5Pcreate(H5P_FILE_ACCESS);
@@ -134,16 +145,17 @@ main(int argc, char **argv)
 	
 	
 	// Chunk Compression Filter:
-	unsigned int filter_info; herr_t filter_ret = -1;
-	if( H5Zfilter_avail(H5Z_FILTER_DEFLATE) > 0 )
-		if( H5Zget_filter_info (H5Z_FILTER_DEFLATE, &filter_info) >= 0)
-			if ( (filter_info & H5Z_FILTER_CONFIG_ENCODE_ENABLED) && (filter_info & H5Z_FILTER_CONFIG_DECODE_ENABLED) )
-			{
-				filter_ret = H5Pset_deflate(data_create_pl, 6 );
-			}
-	if ( filter_ret<0 )
-		throw std::runtime_error("WxHdf5IoTmpl::writeDataSet: Unexpected deflate filter setup failure.");
-	
+	if (compress) {
+		unsigned int filter_info; herr_t filter_ret = -1;
+		if( H5Zfilter_avail(H5Z_FILTER_DEFLATE) > 0 )
+			if( H5Zget_filter_info (H5Z_FILTER_DEFLATE, &filter_info) >= 0)
+				if ( (filter_info & H5Z_FILTER_CONFIG_ENCODE_ENABLED) && (filter_info & H5Z_FILTER_CONFIG_DECODE_ENABLED) )
+				{
+					filter_ret = H5Pset_deflate(data_create_pl, 6 );
+				}
+		if ( filter_ret<0 )
+			throw std::runtime_error("WxHdf5IoTmpl::writeDataSet: Unexpected deflate filter setup failure.");
+	}	
 	
 	hid_t dn = H5Dcreate(variables_node, "pdf", H5T_NATIVE_DOUBLE, filespace, H5P_DEFAULT, data_create_pl, data_access_pl);
 	herr_t pset_ret5 = H5Pclose(data_access_pl);
