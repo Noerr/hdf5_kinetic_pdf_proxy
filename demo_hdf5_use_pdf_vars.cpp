@@ -109,7 +109,7 @@ main(int argc, char **argv)
 	hid_t filespace = H5Screate_simple(rank, fileExtent, NULL);  // NULL restricts max size to initial size
 	
 	hid_t data_create_pl = H5Pcreate(H5P_DATASET_CREATE);
-	
+	hid_t data_access_pl = H5Pcreate(H5P_DATASET_ACCESS);
 	
 	// This writeDataSet implementation has been written assuming the entire dataset is written at once (thus the H5Dcreate call below inside writeDataSet)
 	// and no provision or promise for what should be expected in unwritten regions of the data set. (undefined)
@@ -124,17 +124,22 @@ main(int argc, char **argv)
 	hsize_t chunkShape[rank] = {1,1,1,NV,NV,NV,dof,num_species};
 	herr_t pset_ret2 = H5Pset_chunk (data_create_pl, rank, &chunkShape[0]);
 	
+	// Chunk cache:
+	const size_t cache_size_Bytes = /*8 chunks of cache:*/ 8*NV*NV*NV*dof*num_species*sizeof(double);
+	herr_t pset_ret4 = H5Pset_chunk_cache(data_access_pl, H5D_CHUNK_CACHE_NSLOTS_DEFAULT, cache_size_Bytes, 1.0 /*prempt fully written chunks*/ );
 	
-	if (pset_ret1 < 0 || pset_ret2 < 0)
+	
+	if (pset_ret1 < 0 || pset_ret2 < 0 || pset_ret4 < 0 || data_access_pl == H5I_INVALID_HID)
 		throw std::runtime_error("WxHdf5IoTmpl::writeDataSet: Unexpected dataset property set failed.");
 	
 	
-	//hid_t data_access_pl = H5Pcreate(H5P_DATASET_ACCESS);
 	
-	hid_t dn = H5Dcreate(variables_node, "pdf", H5T_NATIVE_DOUBLE, filespace, H5P_DEFAULT, data_create_pl, H5P_DEFAULT);
+	
+	hid_t dn = H5Dcreate(variables_node, "pdf", H5T_NATIVE_DOUBLE, filespace, H5P_DEFAULT, data_create_pl, data_access_pl);
+	herr_t pset_ret5 = H5Pclose(data_access_pl);
 	herr_t pset_ret3 = H5Pclose(data_create_pl);
 	herr_t ret4 = H5Gclose(variables_node);
-	if (pset_ret3 < 0 || ret4 < 0)
+	if (pset_ret3 < 0 || ret4 < 0 || pset_ret5 < 0)
 		throw std::runtime_error("WxHdf5IoTmpl::writeDataSet: Unexpected H5?close failed.");
 	
 	
