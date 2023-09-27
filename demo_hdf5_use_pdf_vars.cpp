@@ -133,6 +133,16 @@ main(int argc, char **argv)
 		throw std::runtime_error("WxHdf5IoTmpl::writeDataSet: Unexpected dataset property set failed.");
 	
 	
+	// Chunk Compression Filter:
+	unsigned int filter_info; herr_t filter_ret = -1;
+	if( H5Zfilter_avail(H5Z_FILTER_DEFLATE) > 0 )
+		if( H5Zget_filter_info (H5Z_FILTER_DEFLATE, &filter_info) >= 0)
+			if ( (filter_info & H5Z_FILTER_CONFIG_ENCODE_ENABLED) && (filter_info & H5Z_FILTER_CONFIG_DECODE_ENABLED) )
+			{
+				filter_ret = H5Pset_deflate(data_create_pl, 6 );
+			}
+	if ( filter_ret<0 )
+		throw std::runtime_error("WxHdf5IoTmpl::writeDataSet: Unexpected deflate filter setup failure.");
 	
 	
 	hid_t dn = H5Dcreate(variables_node, "pdf", H5T_NATIVE_DOUBLE, filespace, H5P_DEFAULT, data_create_pl, data_access_pl);
